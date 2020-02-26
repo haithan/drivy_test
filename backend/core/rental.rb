@@ -7,6 +7,14 @@ class Rental
     { value: 10, rate: 50 }
   ].freeze
 
+  PAYMENT_SETTING = [
+    { who: 'driver', type: 'debit' },
+    { who: 'owner', type: 'credit' },
+    { who: 'insurance', type: 'credit' },
+    { who: 'assistance', type: 'credit' },
+    { who: 'drivy', type: 'credit' },
+  ].freeze
+
   attr_reader :id, :price, :insurance_fee, :assistance_fee, :commission,
               :drivy_fee, :pricing_by_time, :pricing_by_range,
               :rental_period, :start_date, :end_date, :distance,
@@ -27,6 +35,14 @@ class Rental
     default_json
     default_json.merge!(commission_data_json) unless @commission.nil?
   end
+
+  def to_action_json
+    { 
+      id: @id,
+      actions: action_json 
+    }
+  end
+  
   
   def calculate_price(is_deduce = false)
     @price =  @pricing_by_time + @pricing_by_range
@@ -40,10 +56,17 @@ class Rental
     @drivy_fee = @commission - @insurance_fee - @assistance_fee
   end
 
-  def payment
-    
+  def action_json
+    actions = []
+    PAYMENT_SETTING.each do |payment_e|
+      actions << {
+        who: payment_e[:who],
+        type: payment_e[:type],
+        amount: payment(payment_e[:who])
+      }
+    end
+    actions 
   end
-  
   
   private
 
@@ -60,7 +83,7 @@ class Rental
       period = period - actual_day
       price += (@car[:price_per_day] * (e[:rate].to_f/100) * actual_day)
     end
-    price
+    price.to_i
   end
 
   def calculate_with_time
@@ -95,4 +118,22 @@ class Rental
       }
     }
   end
+
+  def payment(who)
+    case who
+    when 'driver'
+      @price
+    when 'owner'
+      @price - @commission
+    when 'insurance'
+      @insurance_fee
+    when 'assistance'
+      @assistance_fee
+    when 'drivy'
+      @drivy_fee
+    else
+      0
+    end
+  end
+  
 end
